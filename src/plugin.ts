@@ -16,6 +16,11 @@ export const plugin: Plugin = {
           `[vite-dts] Expected "build.lib.entry" to exist in vite config`
         )
       }
+      if (typeof entry !== 'string') {
+        return logger.warn(
+          `[vite-dts] Multi-entry libs are currently unsupported`
+        )
+      }
 
       const pkg = await loadJSON<any>(path.join(config.root, 'package.json'))
 
