@@ -3,7 +3,13 @@ import loadJSON from 'load-json-file'
 import * as path from 'path'
 import * as fs from 'fs'
 
-export const plugin: Plugin = {
+export default function dts(): Plugin {
+  const data = {
+    cjsModulePath: '',
+    esModulePath: '',
+    dtsModule: '',
+  }
+  return {
     name: 'vite:dts',
     apply: 'build',
     async configResolved(config) {
@@ -34,6 +40,7 @@ export const plugin: Plugin = {
           `[vite-dts] Expected "module" to exist in package.json`
         )
       }
+      logger.info(`formats: ${formats}; pkg.module: ${pkg.module}`)
 
       const entryPath = path.resolve(config.root, entry)
       const entryImportPath = path.relative(
@@ -47,27 +54,31 @@ export const plugin: Plugin = {
       const hasDefaultExport =
         /^(export default |export \{[^}]+? as default\s*[,}])/m.test(entryImpl)
 
-      const dtsModule =
+      data.dtsModule =
         `export * from "${posixEntryImportPath}"` +
         (hasDefaultExport ? `\nexport {default} from "${posixEntryImportPath}"` : ``)
 
-      const cjsModulePath = path.relative(outDir, pkg.main)
-      const esModulePath = path.relative(outDir, pkg.module)
-
-      plugin.generateBundle = function ({ entryFileNames }) {
-        if (entryFileNames == cjsModulePath) {
-          this.emitFile({
-            type: 'asset',
-            fileName: cjsModulePath.replace(/\.js$/, '.d.ts'),
-            source: dtsModule,
-          })
-        } else if (entryFileNames == esModulePath) {
-          this.emitFile({
-            type: 'asset',
-            fileName: esModulePath.replace(/\.js$/, '.d.ts'),
-            source: dtsModule,
-          })
-        }
-      }
+      data.cjsModulePath = pkg.main ? path.relative(outDir, pkg.main) : ''
+      data.esModulePath = pkg.module ? path.relative(outDir, pkg.module) : ''
+      console.log(`esModulePath: ${data.esModulePath}`)
     },
+
+    generateBundle (_, bundle) {
+      console.log(`bundle keys: ${Object.keys(bundle)}`)
+      if (bundle[data.cjsModulePath]) {
+        this.emitFile({
+          type: 'asset',
+          fileName: data.cjsModulePath.replace(/\.js$/, '.d.ts'),
+          source: data.dtsModule,
+        })
+      } else if (bundle[data.esModulePath]) {
+        console.log("doing emitFile")
+        this.emitFile({
+          type: 'asset',
+          fileName: data.esModulePath.replace(/\.mjs$/, '.d.ts'),
+          source: data.dtsModule,
+        })
+      }
+    }
+  }
 }
